@@ -1,22 +1,13 @@
 import socket
 
 import pytest
-import respx
 
 from app.checks.reputation import GSB_ENDPOINT
 
-OLD_DOMAIN_RDAP = {
-    "events": [{"eventAction": "registration", "eventDate": "2013-01-01T00:00:00Z"}]
-}
-
 
 @pytest.fixture(autouse=True)
-def external_network():
-    """Default happy-path mocks for RDAP and redirect probes; GSB added per-test."""
-    with respx.mock(assert_all_called=False, assert_all_mocked=True) as router:
-        router.get(host="rdap.org").respond(json=OLD_DOMAIN_RDAP)
-        router.head().respond(200)
-        yield router
+def _mock_external_network(external_network):
+    """Every test in this module talks to mocked RDAP/redirect endpoints."""
 
 
 RESPONSE_KEYS = {
