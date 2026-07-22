@@ -1,11 +1,14 @@
 """Analysis orchestrator: validation -> checks -> aggregate -> report."""
 
+import asyncio
 import time
 from datetime import UTC, datetime
 
 import httpx
 
+from app.checks.domain_age import check_domain_age
 from app.checks.lexical import LEXICAL_CHECKS
+from app.checks.redirects import check_redirect_chain
 from app.checks.reputation import lookup_safe_browsing
 from app.checks.structure import STRUCTURE_CHECKS
 from app.models import AnalysisResponse
@@ -24,11 +27,14 @@ async def analyze(url: str, http: httpx.AsyncClient, gsb_api_key: str) -> Analys
 
     checks = [check(validated) for check in LOCAL_CHECKS]
 
-    # credentials are stripped from outbound_url before it leaves the box
-    safe_browsing, sb_check = await lookup_safe_browsing(
-        validated.outbound_url, http, gsb_api_key
+    # network checks run concurrently; each degrades to 'unavailable' on its
+    # own rather than raising. credentials are stripped from outbound_url.
+    (safe_browsing, sb_check), age_check, redirect_check = await asyncio.gather(
+        lookup_safe_browsing(validated.outbound_url, http, gsb_api_key),
+        check_domain_age(validated.host, http),
+        check_redirect_chain(validated, http),
     )
-    checks.append(sb_check)
+    checks.extend([sb_check, age_check, redirect_check])
 
     summary = aggregate(checks, safe_browsing)
 

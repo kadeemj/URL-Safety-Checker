@@ -1,8 +1,23 @@
 import socket
 
+import pytest
 import respx
 
 from app.checks.reputation import GSB_ENDPOINT
+
+OLD_DOMAIN_RDAP = {
+    "events": [{"eventAction": "registration", "eventDate": "2013-01-01T00:00:00Z"}]
+}
+
+
+@pytest.fixture(autouse=True)
+def external_network():
+    """Default happy-path mocks for RDAP and redirect probes; GSB added per-test."""
+    with respx.mock(assert_all_called=False, assert_all_mocked=True) as router:
+        router.get(host="rdap.org").respond(json=OLD_DOMAIN_RDAP)
+        router.head().respond(200)
+        yield router
+
 
 RESPONSE_KEYS = {
     "submitted_url",
@@ -82,23 +97,33 @@ class TestCheckEndpoint:
 
 
 class TestSafeBrowsingIntegration:
-    @respx.mock
-    def test_gsb_hit_forces_dangerous_verdict(self, gsb_key, client, public_dns) -> None:
-        respx.post(GSB_ENDPOINT).respond(
+    def test_gsb_hit_forces_dangerous_verdict(
+        self, external_network, gsb_key, client, public_dns
+    ) -> None:
+        external_network.post(GSB_ENDPOINT).respond(
             json={"matches": [{"threatType": "SOCIAL_ENGINEERING"}]}
         )
-        response = client.post("/api/v1/check", json={"url": "https://phish.example/"})
+        response = client.post("/api/v1/check", json={"url": "https://phish-site.com/"})
         data = response.json()
         assert data["verdict"] == "dangerous"
         assert data["score"] >= 95
         assert data["safe_browsing"]["status"] == "hit"
         assert data["confidence"] == "full"
 
-    @respx.mock
-    def test_gsb_clear_leaves_heuristic_verdict(self, gsb_key, client, public_dns) -> None:
-        respx.post(GSB_ENDPOINT).respond(json={})
+    def test_gsb_clear_leaves_heuristic_verdict(
+        self, external_network, gsb_key, client, public_dns
+    ) -> None:
+        external_network.post(GSB_ENDPOINT).respond(json={})
         response = client.post("/api/v1/check", json={"url": "https://github.com/"})
         data = response.json()
         assert data["verdict"] == "safe"
         assert data["safe_browsing"]["status"] == "clear"
         assert data["confidence"] == "full"
+
+    def test_network_checks_appear_in_report(
+        self, external_network, gsb_key, client, public_dns
+    ) -> None:
+        external_network.post(GSB_ENDPOINT).respond(json={})
+        response = client.post("/api/v1/check", json={"url": "https://github.com/"})
+        ids = {c["id"] for c in response.json()["checks"]}
+        assert {"safe_browsing", "domain_age", "redirect_chain"} <= ids
