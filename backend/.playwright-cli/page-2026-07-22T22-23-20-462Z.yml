@@ -1,0 +1,125 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e6]:
+      - heading "URL Safety Checker" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Paste a link. Get a verdict — and the reasoning behind it.
+  - main [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]: URL to analyze
+      - generic [ref=e12]:
+        - textbox "URL to analyze" [ref=e13]:
+          - /placeholder: https://example.com/suspicious/link
+          - text: http://93.184.216.34/paypal/login/verify
+        - button "Analyze" [ref=e14] [cursor=pointer]
+      - paragraph [ref=e15]: The URL is sent to the analysis API only. Nothing is stored. Analysis is advisory — when in doubt, don't click.
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: "50"
+          - generic [ref=e23]: risk / 100
+        - generic [ref=e24]:
+          - heading "Suspicious" [level=2] [ref=e25]
+          - paragraph [ref=e26]: Several risk signals triggered. Do not enter credentials or download files from this link.
+      - img "Risk score 50 out of 100" [ref=e27]
+      - paragraph [ref=e29]: "http://93.184.216.34/paypal/login/verify · analyzed in 3004 ms · confidence: partial (some external lookups were unavailable)"
+      - group [ref=e30]:
+        - generic "Threat intelligence unavailable ▸" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: Threat intelligence
+          - generic [ref=e33]: unavailable
+          - text: ▸
+      - group [ref=e34]:
+        - generic "Impersonation & wording 1 flagged ▾" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]: Impersonation & wording
+          - generic [ref=e37]: 1 flagged
+          - text: ▾
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - generic [ref=e40]: ⚠
+            - generic [ref=e41]: Phishing lure keywords
+            - generic [ref=e42]: "+12"
+          - paragraph [ref=e43]: Lure words login, verify appear alongside the brand 'paypal' on a domain that is not paypal
+          - paragraph [ref=e44]: Words like 'login', 'verify', and 'secure' next to a brand name on a domain that brand does not own is the classic phishing lure pattern.
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - generic [ref=e47]: ✓
+            - generic [ref=e48]: Look-alike characters
+            - generic [ref=e49]: passed
+          - paragraph [ref=e50]: Internationalized domain names can use non-Latin characters that render identically to Latin ones — 'pаypаl.com' with Cyrillic а is a different domain from paypal.com but looks the same in the address bar.
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - generic [ref=e53]: ✓
+            - generic [ref=e54]: Look-alike domain
+            - generic [ref=e55]: passed
+          - paragraph [ref=e56]: Attackers register domains one or two keystrokes away from real brands (paypa1.com), or hide a real brand inside the subdomain (paypal.com.evil.tk) so the address starts with a trusted name.
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]: ✓
+            - generic [ref=e60]: High-abuse domain ending
+            - generic [ref=e61]: passed
+          - paragraph [ref=e62]: Some domain endings are free or near-free to register and appear in phishing campaigns far out of proportion to legitimate use. A weak signal by itself, weighted accordingly.
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]: ✓
+            - generic [ref=e66]: Shortened link hides destination
+            - generic [ref=e67]: passed
+          - paragraph [ref=e68]: Shorteners are legitimate services, but the visible link tells you nothing about where it leads — every other safety signal is hidden behind the redirect.
+      - group [ref=e69]:
+        - generic "URL structure 3 flagged ▾" [ref=e70] [cursor=pointer]:
+          - generic [ref=e71]: URL structure
+          - generic [ref=e72]: 3 flagged
+          - text: ▾
+        - generic [ref=e73]:
+          - generic [ref=e74]:
+            - generic [ref=e75]: ⚠
+            - generic [ref=e76]: Raw IP address instead of domain
+            - generic [ref=e77]: "+20"
+          - paragraph [ref=e78]: Host is the literal address 93.184.216.34
+          - paragraph [ref=e79]: Legitimate sites use domain names. A raw IP address hides who owns the server and often points at compromised or short-lived hosts.
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]: ⚠
+            - generic [ref=e83]: Unencrypted connection
+            - generic [ref=e84]: "+10"
+          - paragraph [ref=e85]: URL uses http://, not https://
+          - paragraph [ref=e86]: Legitimate services serve login and account pages over HTTPS. Plain HTTP exposes everything you type and is common on throwaway phishing infrastructure.
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - generic [ref=e89]: ⚠
+            - generic [ref=e90]: Machine-generated domain pattern
+            - generic [ref=e91]: "+8"
+          - paragraph [ref=e92]: 77% of '93.184.216.34' is digits
+          - paragraph [ref=e93]: Domains packed with hyphens or digits are typical of bulk-registered throwaway infrastructure rather than an established brand.
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e96]: ✓
+            - generic [ref=e97]: Deceptive username-in-URL
+            - generic [ref=e98]: passed
+          - paragraph [ref=e99]: Anything before an @ in a URL is a username, not the destination. Attackers exploit this so 'https://paypal.com@evil.example' looks like PayPal but actually visits evil.example.
+        - generic [ref=e100]:
+          - generic [ref=e101]:
+            - generic [ref=e102]: ✓
+            - generic [ref=e103]: Non-standard port
+            - generic [ref=e104]: passed
+          - paragraph [ref=e105]: Web traffic runs on ports 80 and 443. An explicit unusual port often means an ad-hoc server rather than production infrastructure.
+        - generic [ref=e106]:
+          - generic [ref=e107]:
+            - generic [ref=e108]: ✓
+            - generic [ref=e109]: Excessive subdomain nesting
+            - generic [ref=e110]: passed
+          - paragraph [ref=e111]: Long subdomain chains like login.secure.account.verify.example.com push a trustworthy-looking word into the visible part of the address bar while the real domain hides at the end.
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - generic [ref=e114]: ✓
+            - generic [ref=e115]: Unusually long or random-looking URL
+            - generic [ref=e116]: passed
+          - paragraph [ref=e117]: Phishing links are often stuffed with long random tokens to evade filters and to give each victim a unique tracking URL.
+      - group [ref=e118]:
+        - generic "Infrastructure behavior unavailable ▸" [ref=e119] [cursor=pointer]:
+          - generic [ref=e120]: Infrastructure behavior
+          - generic [ref=e121]: unavailable
+          - text: ▸
+  - contentinfo [ref=e16]:
+    - paragraph [ref=e17]:
+      - text: 14 local heuristics + Google Safe Browsing · FastAPI backend ·
+      - link "source on GitHub" [ref=e18] [cursor=pointer]:
+        - /url: https://github.com/kadeemj/URL-Safety-Checker

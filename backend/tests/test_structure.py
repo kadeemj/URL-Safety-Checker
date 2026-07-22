@@ -105,3 +105,8 @@ class TestDomainLexical:
 
     def test_normal_domain_passes(self) -> None:
         assert check_domain_lexical(v("https://github.com/")).status == CheckStatus.PASSED
+
+    def test_ip_host_does_not_double_count(self) -> None:
+        # ip_address_host already penalizes literal IPs; the digit-ratio
+        # heuristic must not pile on for the same fact
+        assert check_domain_lexical(v("http://93.184.216.34/")).status == CheckStatus.PASSED

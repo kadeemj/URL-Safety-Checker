@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>URL Safety Checker</title>
+  <meta name="description" content="Analyze any link for phishing and malware signals: 14 security heuristics plus Google Safe Browsing, explained in plain English." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="shield" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M12 2 4 5v6c0 5.25 3.4 10.15 8 11 4.6-.85 8-5.75 8-11V5l-8-3z"/></svg>
+    </div>
+    <div>
+      <h1>URL Safety Checker</h1>
+      <p class="tagline">Paste a link. Get a verdict — and the reasoning behind it.</p>
+    </div>
+  </header>
+
+  <main>
+    <form id="check-form" autocomplete="off">
+      <label class="visually-hidden" for="url-input">URL to analyze</label>
+      <div class="input-row">
+        <input
+          id="url-input"
+          name="url"
+          type="text"
+          inputmode="url"
+          spellcheck="false"
+          placeholder="https://example.com/suspicious/link"
+          required
+        />
+        <button id="submit-btn" type="submit">Analyze</button>
+      </div>
+      <p class="hint">
+        The URL is sent to the analysis API only. Nothing is stored.
+        Analysis is advisory — when in doubt, don't click.
+      </p>
+    </form>
+
+    <section id="status" class="status hidden" aria-live="polite"></section>
+
+    <section id="report" class="report hidden" aria-live="polite"></section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      14 local heuristics + Google Safe Browsing &middot; FastAPI backend &middot;
+      <a href="https://github.com/kadeemj/URL-Safety-Checker" rel="noopener">source on GitHub</a>
+    </p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

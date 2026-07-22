@@ -64,10 +64,12 @@ def check_userinfo_trick(url: ValidatedURL) -> CheckResult:
     )
 
 
+def _looks_like_ip(host: str) -> bool:
+    return host.replace(".", "").isdigit() or ":" in host
+
+
 def check_ip_address_host(url: ValidatedURL) -> CheckResult:
-    looks_like_ip = url.parts.hostname is not None and (
-        url.host.replace(".", "").isdigit() or ":" in url.host
-    )
+    looks_like_ip = url.parts.hostname is not None and _looks_like_ip(url.host)
     return _result(
         "ip_address_host",
         "Raw IP address instead of domain",
@@ -144,6 +146,16 @@ def check_url_length_entropy(url: ValidatedURL) -> CheckResult:
 
 
 def check_domain_lexical(url: ValidatedURL) -> CheckResult:
+    if _looks_like_ip(url.host):
+        # literal IPs are ip_address_host's territory; don't double-count digits
+        return _result(
+            "domain_lexical",
+            "Machine-generated domain pattern",
+            8,
+            "Domains packed with hyphens or digits are typical of bulk-registered "
+            "throwaway infrastructure rather than an established brand.",
+            triggered=False,
+        )
     label = domain_label(url.host)
     hyphens = label.count("-")
     digits = sum(ch.isdigit() for ch in label)

@@ -10,7 +10,10 @@ class Settings(BaseSettings):
 
     google_safe_browsing_api_key: str = ""
     # comma-separated list of origins allowed to call the API
-    allowed_origins: str = "http://localhost:8000,http://127.0.0.1:8000,null"
+    allowed_origins: str = (
+        "http://localhost:8000,http://127.0.0.1:8000,"
+        "http://localhost:3000,http://127.0.0.1:3000,null"
+    )
     rate_limit_per_minute: int = 10
 
     @property
