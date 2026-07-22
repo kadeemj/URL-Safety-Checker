@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: url-safety-checker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /healthz
+    envVars:
+      - key: GOOGLE_SAFE_BROWSING_API_KEY
+        sync: false # set in the Render dashboard, never in the repo
+      - key: ALLOWED_ORIGINS
+        value: https://kadeemj.github.io
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "10"
