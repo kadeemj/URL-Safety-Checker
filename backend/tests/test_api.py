@@ -1,5 +1,9 @@
 import socket
 
+import respx
+
+from app.checks.reputation import GSB_ENDPOINT
+
 RESPONSE_KEYS = {
     "submitted_url",
     "normalized_url",
@@ -75,3 +79,26 @@ class TestCheckEndpoint:
 
     def test_missing_body_rejected_with_422(self, client) -> None:
         assert client.post("/api/v1/check", json={}).status_code == 422
+
+
+class TestSafeBrowsingIntegration:
+    @respx.mock
+    def test_gsb_hit_forces_dangerous_verdict(self, gsb_key, client, public_dns) -> None:
+        respx.post(GSB_ENDPOINT).respond(
+            json={"matches": [{"threatType": "SOCIAL_ENGINEERING"}]}
+        )
+        response = client.post("/api/v1/check", json={"url": "https://phish.example/"})
+        data = response.json()
+        assert data["verdict"] == "dangerous"
+        assert data["score"] >= 95
+        assert data["safe_browsing"]["status"] == "hit"
+        assert data["confidence"] == "full"
+
+    @respx.mock
+    def test_gsb_clear_leaves_heuristic_verdict(self, gsb_key, client, public_dns) -> None:
+        respx.post(GSB_ENDPOINT).respond(json={})
+        response = client.post("/api/v1/check", json={"url": "https://github.com/"})
+        data = response.json()
+        assert data["verdict"] == "safe"
+        assert data["safe_browsing"]["status"] == "clear"
+        assert data["confidence"] == "full"

@@ -3,16 +3,19 @@
 import time
 from datetime import UTC, datetime
 
+import httpx
+
 from app.checks.lexical import LEXICAL_CHECKS
+from app.checks.reputation import lookup_safe_browsing
 from app.checks.structure import STRUCTURE_CHECKS
-from app.models import AnalysisResponse, SafeBrowsingResult
+from app.models import AnalysisResponse
 from app.scoring import aggregate
 from app.validation import ensure_host_resolves_public, validate_url_syntax
 
 LOCAL_CHECKS = STRUCTURE_CHECKS + LEXICAL_CHECKS
 
 
-async def analyze(url: str) -> AnalysisResponse:
+async def analyze(url: str, http: httpx.AsyncClient, gsb_api_key: str) -> AnalysisResponse:
     """Run the full pipeline. Raises URLValidationError on unacceptable input."""
     started = time.perf_counter()
 
@@ -21,8 +24,11 @@ async def analyze(url: str) -> AnalysisResponse:
 
     checks = [check(validated) for check in LOCAL_CHECKS]
 
-    # Reputation lookup lands in a later step; report it honestly as absent.
-    safe_browsing = SafeBrowsingResult(status="unavailable", threats=[])
+    # credentials are stripped from outbound_url before it leaves the box
+    safe_browsing, sb_check = await lookup_safe_browsing(
+        validated.outbound_url, http, gsb_api_key
+    )
+    checks.append(sb_check)
 
     summary = aggregate(checks, safe_browsing)
 

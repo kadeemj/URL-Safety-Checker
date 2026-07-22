@@ -18,4 +18,15 @@ def public_dns(monkeypatch):
 
 @pytest.fixture()
 def client():
-    return TestClient(create_app())
+    with TestClient(create_app()) as test_client:
+        yield test_client
+
+
+@pytest.fixture()
+def gsb_key(monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setenv("GOOGLE_SAFE_BROWSING_API_KEY", "test-key")
+    get_settings.cache_clear()
+    yield "test-key"
+    get_settings.cache_clear()
