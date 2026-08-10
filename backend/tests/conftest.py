@@ -12,8 +12,17 @@ OLD_DOMAIN_RDAP = {
 
 
 @pytest.fixture()
-def external_network():
-    """Default happy-path mocks for RDAP and redirect probes; GSB added per-test."""
+def external_network(monkeypatch):
+    """Default happy-path mocks for RDAP and redirect probes; GSB added per-test.
+
+    Pinned redirect fetches are disabled here so redirect probes flow through
+    the shared client, whose httpcore layer respx mocks (the pinned transport
+    intentionally bypasses it).
+    """
+    from app.config import get_settings
+
+    monkeypatch.setenv("PIN_REDIRECT_FETCHES", "false")
+    get_settings.cache_clear()
     with respx.mock(assert_all_called=False, assert_all_mocked=True) as router:
         router.get(host="rdap.org").respond(json=OLD_DOMAIN_RDAP)
         router.head().respond(200)

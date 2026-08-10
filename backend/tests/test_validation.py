@@ -1,8 +1,14 @@
 import socket
+import time
 
 import pytest
 
-from app.validation import URLValidationError, ensure_host_resolves_public, validate_url_syntax
+from app.validation import (
+    URLValidationError,
+    ensure_host_resolves_public,
+    resolve_public_addresses,
+    validate_url_syntax,
+)
 
 
 @pytest.mark.parametrize(
@@ -89,3 +95,20 @@ async def test_unresolvable_host_rejected(monkeypatch) -> None:
     with pytest.raises(URLValidationError) as exc_info:
         await ensure_host_resolves_public("no-such-host.example")
     assert exc_info.value.code == "UNRESOLVABLE_HOST"
+
+
+async def test_slow_resolver_times_out(monkeypatch) -> None:
+    def slow_getaddrinfo(host, *args, **kwargs):
+        time.sleep(2)
+        return []
+
+    monkeypatch.setattr("app.validation.socket.getaddrinfo", slow_getaddrinfo)
+    with pytest.raises(URLValidationError) as exc_info:
+        await ensure_host_resolves_public("slow.example", timeout=0.05)
+    assert exc_info.value.code == "UNRESOLVABLE_HOST"
+    assert "timed out" in exc_info.value.message
+
+
+async def test_literal_ip_resolves_without_network() -> None:
+    addresses = await resolve_public_addresses("93.184.216.34")
+    assert addresses == ["93.184.216.34"]

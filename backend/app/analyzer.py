@@ -18,8 +18,18 @@ from app.validation import ensure_host_resolves_public, validate_url_syntax
 LOCAL_CHECKS = STRUCTURE_CHECKS + LEXICAL_CHECKS
 
 
-async def analyze(url: str, http: httpx.AsyncClient, gsb_api_key: str) -> AnalysisResponse:
-    """Run the full pipeline. Raises URLValidationError on unacceptable input."""
+async def analyze(
+    url: str,
+    http: httpx.AsyncClient,
+    gsb_api_key: str,
+    redirect_http: httpx.AsyncClient | None = None,
+) -> AnalysisResponse:
+    """Run the full pipeline. Raises URLValidationError on unacceptable input.
+
+    ``redirect_http`` selects the client used to walk redirect chains:
+    ``None`` (default) means a dedicated client over the IP-pinned transport;
+    a shared/mocked client can be injected when resolvers are stubbed.
+    """
     started = time.perf_counter()
 
     validated = validate_url_syntax(url)
@@ -32,7 +42,7 @@ async def analyze(url: str, http: httpx.AsyncClient, gsb_api_key: str) -> Analys
     (safe_browsing, sb_check), age_check, redirect_check = await asyncio.gather(
         lookup_safe_browsing(validated.outbound_url, http, gsb_api_key),
         check_domain_age(validated.host, http),
-        check_redirect_chain(validated, http),
+        check_redirect_chain(validated, redirect_http),
     )
     checks.extend([sb_check, age_check, redirect_check])
 

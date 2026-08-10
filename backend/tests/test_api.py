@@ -1,8 +1,11 @@
 import socket
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app.checks.reputation import GSB_ENDPOINT
+from app.config import get_settings
+from app.main import create_app
 
 
 @pytest.fixture(autouse=True)
@@ -118,3 +121,75 @@ class TestSafeBrowsingIntegration:
         response = client.post("/api/v1/check", json={"url": "https://github.com/"})
         ids = {c["id"] for c in response.json()["checks"]}
         assert {"safe_browsing", "domain_age", "redirect_chain"} <= ids
+
+
+class TestHardening:
+    def test_security_headers_on_all_responses(self, client, public_dns) -> None:
+        response = client.post("/api/v1/check", json={"url": "https://github.com/"})
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["x-frame-options"] == "DENY"
+        assert response.headers["referrer-policy"] == "no-referrer"
+        assert response.headers["cache-control"] == "no-store"
+        assert client.get("/healthz").headers["cache-control"] == "no-store"
+
+    def test_oversized_body_rejected_before_parsing(self, client) -> None:
+        body = b'{"url":"https://example.com/","pad":"' + b"y" * 5000 + b'"}'
+        response = client.post("/api/v1/check", content=body)
+        assert response.status_code == 413
+        assert response.json()["detail"]["code"] == "BODY_TOO_LARGE"
+
+    def test_api_docs_hidden_by_default(self, client) -> None:
+        assert client.get("/docs").status_code == 404
+        assert client.get("/redoc").status_code == 404
+        assert client.get("/openapi.json").status_code == 404
+
+    def test_api_docs_optional_via_env(self, monkeypatch) -> None:
+        monkeypatch.setenv("EXPOSE_API_DOCS", "true")
+        get_settings.cache_clear()
+        try:
+            with TestClient(create_app()) as exposed:
+                assert exposed.get("/docs").status_code == 200
+                assert exposed.get("/openapi.json").status_code == 200
+        finally:
+            get_settings.cache_clear()
+
+    def test_forged_xff_ignored_without_proxy_signal(self, monkeypatch, public_dns) -> None:
+        monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "1")
+        get_settings.cache_clear()
+        try:
+            with TestClient(create_app()) as app_client:
+                first = app_client.post(
+                    "/api/v1/check",
+                    json={"url": "https://a.com/"},
+                    headers={"X-Forwarded-For": "1.2.3.4"},
+                )
+                second = app_client.post(
+                    "/api/v1/check",
+                    json={"url": "https://b.com/"},
+                    headers={"X-Forwarded-For": "5.6.7.8"},
+                )
+                assert first.status_code == 200
+                # no proxy https signal -> both map to the same peer IP -> 429
+                assert second.status_code == 429
+        finally:
+            get_settings.cache_clear()
+
+    def test_forwarded_ip_used_behind_proxy(self, monkeypatch, public_dns) -> None:
+        monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "1")
+        get_settings.cache_clear()
+        try:
+            with TestClient(create_app()) as app_client:
+                first = app_client.post(
+                    "/api/v1/check",
+                    json={"url": "https://c.com/"},
+                    headers={"X-Forwarded-For": "9.9.9.9", "X-Forwarded-Proto": "https"},
+                )
+                second = app_client.post(
+                    "/api/v1/check",
+                    json={"url": "https://d.com/"},
+                    headers={"X-Forwarded-For": "8.8.8.8", "X-Forwarded-Proto": "https"},
+                )
+                assert first.status_code == 200
+                assert second.status_code == 200  # distinct forwarded IPs, distinct buckets
+        finally:
+            get_settings.cache_clear()

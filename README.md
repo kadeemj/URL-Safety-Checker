@@ -91,6 +91,34 @@ Other hardening: origin-restricted CORS, per-IP rate limiting
 (`X-Forwarded-For`-aware behind Render's proxy), non-root Docker image,
 no persistence of submitted URLs.
 
+### Hardening details
+
+- **IP-pinned outbound transport** (`app/transport.py`): the redirect walk
+  resolves each hop, screens every address for publicness, and connects to
+  the *screened address itself* — httpx never re-resolves the hostname, so a
+  DNS answer swapped after validation cannot redirect the fetch into private
+  space. TLS is still verified against the real hostname. Per-walk cache
+  TTL of 60 s; response bodies capped at 1 MiB.
+- **Security headers + `Cache-Control: no-store`** on every API response;
+  scanned URLs are echoed back and must not linger in shared caches.
+- **CSP on the frontend**: `script-src`/`style-src`/`img-src` restricted to
+  `'self'`, `connect-src` limited to the API origin, `frame-ancestors`,
+  `base-uri` and `form-action` locked down (GitHub Pages cannot set headers,
+  so the policy ships as a meta tag).
+- **Request body cap**: `Content-Length` over 4 KB is rejected with 413
+  before JSON parsing (the URL field itself is capped at 2048 chars).
+- **DNS timeouts**: hostname resolution is bounded (5 s) so a hung resolver
+  cannot stall a request.
+- **Rate limiter memory bound**: at most 10,000 distinct IPs are tracked;
+  the longest-idle entry is evicted beyond that. `X-Forwarded-For` is
+  honored only when the proxy's https signal is present, so the header
+  cannot be forged to dodge the limit on a proxy-less deployment.
+- **API docs disabled by default** (`EXPOSE_API_DOCS=false`); `/docs` and
+  `/openapi.json` are 404s in production.
+- **Redirect hops are IP-pinned** (`PIN_REDIRECT_FETCHES=true`): each hop is
+  resolved, screened, and connected *to the screened address*, so a second,
+  unchecked resolution cannot slip past the private-address guard.
+
 ## Run it locally
 
 ```bash
@@ -112,7 +140,7 @@ Works without any API key — the Safe Browsing check just reports
 ```bash
 # tests + lint
 cd backend
-pytest          # 125 tests, all external calls mocked (respx)
+pytest          # 139 tests, all external calls mocked (respx)
 ruff check .
 ```
 

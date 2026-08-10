@@ -15,6 +15,12 @@ class Settings(BaseSettings):
         "http://localhost:3000,http://127.0.0.1:3000,null"
     )
     rate_limit_per_minute: int = 10
+    # serve /docs, /redoc, /openapi.json (default off for production)
+    expose_api_docs: bool = False
+    # walk redirect chains over an IP-pinned transport (default). Disable
+    # only when a shared/mockable http client is preferred, e.g. in tests
+    # whose mocks patch the httpcore layer the pinned transport bypasses.
+    pin_redirect_fetches: bool = True
 
     @property
     def origins_list(self) -> list[str]:

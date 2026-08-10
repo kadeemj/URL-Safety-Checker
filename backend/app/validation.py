@@ -25,6 +25,7 @@ MAX_URL_LENGTH = 2048
 ALLOWED_SCHEMES = {"http", "https"}
 BLOCKED_HOST_SUFFIXES = (".localhost", ".local", ".internal", ".onion")
 BLOCKED_HOSTS = {"localhost"}
+DNS_TIMEOUT_SECONDS = 5.0
 
 
 class URLValidationError(Exception):
@@ -113,27 +114,50 @@ def validate_url_syntax(url: str) -> ValidatedURL:
     )
 
 
-async def ensure_host_resolves_public(host: str) -> None:
-    """Resolve ``host`` and reject it if any address is non-global.
+async def resolve_public_addresses(
+    host: str, timeout: float = DNS_TIMEOUT_SECONDS
+) -> list[str]:
+    """Resolve ``host`` and return only its validated public addresses.
 
-    Defends against names that resolve into private space (DNS-rebinding
+    Rejects the host if *any* returned address is non-global (DNS-rebinding
     style). Literal IPs pass through the same screening. Runs getaddrinfo in
-    a thread so the event loop is never blocked.
+    a thread so the event loop is never blocked, and bounds the wait so a
+    hung resolver cannot stall the request indefinitely. The returned
+    addresses are what an IP-pinned transport should connect to.
     """
     ip = _as_ip(host)
     if ip is not None:
         _reject_non_global_ip(ip, host)
-        return
+        return [str(ip)]
 
     try:
-        infos = await asyncio.to_thread(
-            socket.getaddrinfo, host, None, type=socket.SOCK_STREAM
+        infos = await asyncio.wait_for(
+            asyncio.to_thread(socket.getaddrinfo, host, None, type=socket.SOCK_STREAM),
+            timeout=timeout,
         )
+    except TimeoutError as exc:
+        raise URLValidationError(
+            "UNRESOLVABLE_HOST", f"DNS lookup for '{host}' timed out."
+        ) from exc
     except socket.gaierror as exc:
         raise URLValidationError(
             "UNRESOLVABLE_HOST", f"Host '{host}' did not resolve."
         ) from exc
 
+    addresses: list[str] = []
     for _family, _type, _proto, _canon, sockaddr in infos:
         resolved = ipaddress.ip_address(sockaddr[0])
         _reject_non_global_ip(resolved, host)
+        addresses.append(str(resolved))
+    return addresses
+
+
+async def ensure_host_resolves_public(
+    host: str, timeout: float = DNS_TIMEOUT_SECONDS
+) -> None:
+    """Resolve ``host`` and reject it if any address is non-global.
+
+    Defends against names that resolve into private space (DNS-rebinding
+    style). Literal IPs pass through the same screening.
+    """
+    await resolve_public_addresses(host, timeout=timeout)

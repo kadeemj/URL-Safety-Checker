@@ -34,6 +34,13 @@ class TestRateLimiter:
         assert limiter.check("1.2.3.4", now=0.0) is None
         assert limiter.check("5.6.7.8", now=0.0) is None
 
+    def test_tracked_ip_count_is_bounded(self) -> None:
+        limiter = RateLimiter(limit=100, window_seconds=60, max_ips=2)
+        assert limiter.check("a", now=0.0) is None
+        assert limiter.check("b", now=0.0) is None
+        assert limiter.check("c", now=0.0) is None  # evicts the longest-idle entry
+        assert set(limiter._hits) == {"b", "c"}
+
 
 class TestRateLimitEndpoint:
     def test_429_after_burst(self, client, public_dns) -> None:
