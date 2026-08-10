@@ -162,6 +162,12 @@ ruff check .
   ~30–60 s (the UI explains this while it waits).
 - A "Safe" verdict means *no signals found*, not *proven safe*. Advisory
   tool, not an oracle.
+- The domain-age check (`app/checks/domain_age.py`) still fetches `rdap.org`
+  with `follow_redirects=True` over the shared, unpinned client — the same
+  DNS-rebinding class `PinnedTransport` closes for the redirect-chain walk,
+  just not yet migrated there. `rdap.org` is a fixed, trusted bootstrap
+  redirector rather than attacker-supplied, so the exposure is narrow, but
+  it's not covered by the IP-pinning guarantee described above.
 
 ## License
 
