@@ -32,7 +32,14 @@ class AnalysisResponse(BaseModel):
 
 
 ErrorCode = Literal[
-    "INVALID_SCHEME", "PRIVATE_HOST", "UNRESOLVABLE_HOST", "URL_TOO_LONG", "INVALID_URL"
+    "INVALID_SCHEME",
+    "PRIVATE_HOST",
+    "UNRESOLVABLE_HOST",
+    "URL_TOO_LONG",
+    "INVALID_URL",
+    "BODY_TOO_LARGE",
+    "RATE_LIMITED",
+    "INTERNAL_ERROR",
 ]
 
 

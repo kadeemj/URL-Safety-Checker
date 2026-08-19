@@ -1,0 +1,11 @@
+{
+  "name": "url-safety-checker-frontend-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

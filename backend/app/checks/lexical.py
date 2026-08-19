@@ -119,18 +119,16 @@ def check_punycode_homoglyph(url: ValidatedURL) -> CheckResult:
                     f"visually identical to the brand '{brand}'"
                 ),
             )
+    # International characters alone are not a risk signal. Punishing every
+    # non-Latin domain would flag legitimate regional sites (übung.de,
+    # bücher.de, etc.). Only a skeleton that matches a known brand is an
+    # impersonation signal.
     return _result(
         "punycode_homoglyph",
         "Look-alike characters",
         25,
         explanation,
-        triggered=True,
-        points=20,
-        evidence=(
-            f"Domain uses internationalized characters ('{decoded_host}'); "
-            "these are legitimate for non-English sites but are also a "
-            "common impersonation vector"
-        ),
+        triggered=False,
     )
 
 

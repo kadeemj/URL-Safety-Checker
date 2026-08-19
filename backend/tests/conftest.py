@@ -15,6 +15,7 @@ OLD_DOMAIN_RDAP = {
 def external_network(monkeypatch):
     """Default happy-path mocks for RDAP and redirect probes; GSB added per-test."""
     monkeypatch.setenv("PIN_REDIRECT_FETCHES", "false")
+    monkeypatch.setenv("PIN_RDAP_FETCHES", "false")
     from app.config import get_settings
     get_settings.cache_clear()
     with respx.mock(assert_all_called=False, assert_all_mocked=True) as router:
@@ -29,6 +30,7 @@ DEFAULT_ENV = {
     "ALLOWED_ORIGINS": "http://localhost:8000",  # Allow localhost for dev/testing
     "EXPOSE_API_DOCS": "false",                   # Hide docs by default
     "PIN_REDIRECT_FETCHES": "false",              # Use shared client for tests
+    "PIN_RDAP_FETCHES": "false",                  # Use shared client for tests
 }
 
 

@@ -131,6 +131,9 @@ def create_app() -> FastAPI:
                 redirect_http=(
                     None if settings.pin_redirect_fetches else request.app.state.http
                 ),
+                rdap_http=(
+                    None if settings.pin_rdap_fetches else request.app.state.http
+                ),
                 allow_http_redirect_from_https=settings.allow_http_redirect_from_https,
             )
         except URLValidationError as exc:

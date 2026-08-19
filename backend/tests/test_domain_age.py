@@ -1,9 +1,11 @@
+import json
 from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
 import respx
 
+import app.transport as transport
 from app.checks.base import CheckStatus
 from app.checks.domain_age import check_domain_age
 
@@ -82,3 +84,47 @@ async def test_missing_registration_event_reports_unavailable(http) -> None:
 async def test_ip_host_reports_unavailable(http) -> None:
     result = await check_domain_age("8.8.8.8", http)
     assert result.status == CheckStatus.UNAVAILABLE
+
+
+class FakeSocket:
+    def __init__(self, payload: bytes) -> None:
+        self.payload = payload
+
+    def sendall(self, data: bytes) -> None:
+        pass
+
+    def makefile(self, mode: str):
+        import io
+
+        return io.BytesIO(self.payload)
+
+    def settimeout(self, timeout: float | None) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+async def test_default_transport_is_pinned(monkeypatch) -> None:
+    body = json.dumps(rdap_body(10)).encode()
+    raw = (
+        b"HTTP/1.1 200 OK\r\n"
+        b"content-type: application/json\r\n"
+        b"content-length: " + str(len(body)).encode() + b"\r\n\r\n" + body
+    )
+    monkeypatch.setattr(
+        "app.validation.socket.getaddrinfo",
+        lambda *a, **kw: [(2, 1, 6, "", ("93.184.216.34", 80))],
+    )
+    seen = []
+
+    def fake_connect(ip, port, ssl_context, server_hostname, timeout):
+        seen.append((ip, port, ssl_context, server_hostname))
+        return FakeSocket(raw)
+
+    monkeypatch.setattr(transport, "_connect_tcp", fake_connect)
+    result = await check_domain_age("fresh-phish.com")
+    assert result.status == CheckStatus.TRIGGERED
+    assert result.points == 20
+    assert seen[0][0] == "93.184.216.34"
+    assert seen[0][3] == "rdap.org"

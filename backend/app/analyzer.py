@@ -23,6 +23,7 @@ async def analyze(
     http: httpx.AsyncClient,
     gsb_api_key: str,
     redirect_http: httpx.AsyncClient | None = None,
+    rdap_http: httpx.AsyncClient | None = None,
     allow_http_redirect_from_https: bool = False,
 ) -> AnalysisResponse:
     """Run the full pipeline. Raises URLValidationError on unacceptable input.
@@ -30,6 +31,10 @@ async def analyze(
     ``redirect_http`` selects the client used to walk redirect chains:
     ``None`` (default) means a dedicated client over the IP-pinned transport;
     a shared/mocked client can be injected when resolvers are stubbed.
+
+    ``rdap_http`` selects the client used for the RDAP domain-age lookup:
+    ``None`` (default) means a dedicated client over the IP-pinned transport;
+    a shared/mocked client can be injected in tests.
 
     ``allow_http_redirect_from_https`` controls whether redirects from
     HTTPS to HTTP are permitted during chain walking. Defaults to False
@@ -46,7 +51,7 @@ async def analyze(
     # own rather than raising. Credentials are stripped from outbound_url.
     (safe_browsing, sb_check), age_check, redirect_check = await asyncio.gather(
         lookup_safe_browsing(validated.outbound_url, http, gsb_api_key),
-        check_domain_age(validated.host, http),
+        check_domain_age(validated.host, rdap_http),
         check_redirect_chain(validated, redirect_http, allow_http_redirect_from_https),
     )
     checks.extend([sb_check, age_check, redirect_check])

@@ -83,7 +83,7 @@ def _build_response(
         headers=cleaned,
         content=body,
         request=request,
-        extensions={"reason_phrase": reason},
+        extensions={"reason_phrase": reason.encode("ascii", "ignore")},
     )
 
 

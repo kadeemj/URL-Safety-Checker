@@ -1,5 +1,5 @@
 from app.checks.base import CheckCategory, CheckResult, CheckStatus
-from app.models import AnalysisResponse, SafeBrowsingResult
+from app.models import AnalysisResponse, ErrorDetail, SafeBrowsingResult
 
 
 def make_check(**overrides) -> CheckResult:
@@ -47,3 +47,8 @@ def test_analysis_response_shape() -> None:
     assert data["verdict"] == "dangerous"
     assert data["safe_browsing"]["status"] == "clear"
     assert len(data["checks"]) == 1
+
+
+def test_error_detail_accepts_all_runtime_codes() -> None:
+    for code in ["BODY_TOO_LARGE", "RATE_LIMITED", "INTERNAL_ERROR"]:
+        assert ErrorDetail(code=code, message="x").code == code

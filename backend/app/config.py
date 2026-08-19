@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # only when a shared/mockable http client is preferred, e.g. in tests
     # whose mocks patch the httpcore layer the pinned transport bypasses.
     pin_redirect_fetches: bool = True
+    # Fetch RDAP over the same IP-pinned transport (default). Disable for the
+    # same mocking reasons as pin_redirect_fetches.
+    pin_rdap_fetches: bool = True
     # Reject HTTP redirects that originate from HTTPS (prevents downgrade attacks).
     allow_http_redirect_from_https: bool = False
 

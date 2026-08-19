@@ -13,6 +13,8 @@ import httpx
 
 from app.checks.base import CheckCategory, CheckResult, CheckStatus
 from app.domains import registrable_domain
+from app.transport import PinnedTransport
+from app.validation import URLValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +43,25 @@ def _result(status: CheckStatus, points: int, evidence: str | None) -> CheckResu
     )
 
 
-async def check_domain_age(host: str, http: httpx.AsyncClient) -> CheckResult:
+async def check_domain_age(
+    host: str, http: httpx.AsyncClient | None = None
+) -> CheckResult:
     domain = registrable_domain(host)
     if not domain:
         return _result(
             CheckStatus.UNAVAILABLE, 0, "Host has no registrable domain (IP address?)"
+        )
+
+    # Prefer the IP-pinned transport: like the redirect walk, the RDAP
+    # bootstrap redirector and its registry targets are resolved, screened,
+    # and connected to the screened address. An injected client is kept for
+    # tests whose mocks live at the httpcore layer.
+    owned_client = http is None
+    if http is None:
+        http = httpx.AsyncClient(
+            transport=PinnedTransport(timeout=RDAP_TIMEOUT_SECONDS),
+            follow_redirects=True,
+            timeout=RDAP_TIMEOUT_SECONDS,
         )
 
     try:
@@ -56,9 +72,12 @@ async def check_domain_age(host: str, http: httpx.AsyncClient) -> CheckResult:
         )
         response.raise_for_status()
         events = response.json().get("events", [])
-    except (httpx.HTTPError, ValueError) as exc:
+    except (httpx.HTTPError, ValueError, URLValidationError) as exc:
         logger.warning("RDAP lookup for %s failed: %s", domain, exc)
         return _result(CheckStatus.UNAVAILABLE, 0, "Registration data could not be retrieved")
+    finally:
+        if owned_client:
+            await http.aclose()
 
     registered_raw = next(
         (e.get("eventDate") for e in events if e.get("eventAction") == "registration"),

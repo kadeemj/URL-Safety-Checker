@@ -42,11 +42,11 @@ class TestPunycodeHomoglyph:
         assert result.status == CheckStatus.TRIGGERED
         assert result.points == 25
 
-    def test_punycode_without_brand_match_triggers_base(self) -> None:
+    def test_punycode_without_brand_match_passes(self) -> None:
         host = "xn--" + "übung".encode("punycode").decode("ascii")
         result = check_punycode_homoglyph(v(f"https://{host}.de/"))
-        assert result.status == CheckStatus.TRIGGERED
-        assert result.points == 20
+        assert result.status == CheckStatus.PASSED
+        assert result.points == 0
 
     def test_plain_ascii_passes(self) -> None:
         assert check_punycode_homoglyph(v("https://example.com/")).status == CheckStatus.PASSED
