@@ -9,18 +9,19 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     google_safe_browsing_api_key: str = ""
-    # comma-separated list of origins allowed to call the API
-    allowed_origins: str = (
-        "http://localhost:8000,http://127.0.0.1:8000,"
-        "http://localhost:3000,http://127.0.0.1:3000,null"
-    )
+    # Comma-separated list of origins allowed to call the API.
+    # Empty by default — no CORS unless explicitly configured for prod.
+    # In development set ALLOWED_ORIGINS=localhost dev origins as needed.
+    allowed_origins: str = ""
     rate_limit_per_minute: int = 10
-    # serve /docs, /redoc, /openapi.json (default off for production)
+    # Serve /docs, /redoc, /openapi.json (default off for production)
     expose_api_docs: bool = False
-    # walk redirect chains over an IP-pinned transport (default). Disable
+    # Walk redirect chains over an IP-pinned transport (default). Disable
     # only when a shared/mockable http client is preferred, e.g. in tests
     # whose mocks patch the httpcore layer the pinned transport bypasses.
     pin_redirect_fetches: bool = True
+    # Reject HTTP redirects that originate from HTTPS (prevents downgrade attacks).
+    allow_http_redirect_from_https: bool = False
 
     @property
     def origins_list(self) -> list[str]:

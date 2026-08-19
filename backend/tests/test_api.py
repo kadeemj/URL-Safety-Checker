@@ -153,43 +153,33 @@ class TestHardening:
         finally:
             get_settings.cache_clear()
 
-    def test_forged_xff_ignored_without_proxy_signal(self, monkeypatch, public_dns) -> None:
-        monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "1")
-        get_settings.cache_clear()
-        try:
-            with TestClient(create_app()) as app_client:
-                first = app_client.post(
-                    "/api/v1/check",
-                    json={"url": "https://a.com/"},
-                    headers={"X-Forwarded-For": "1.2.3.4"},
-                )
-                second = app_client.post(
-                    "/api/v1/check",
-                    json={"url": "https://b.com/"},
-                    headers={"X-Forwarded-For": "5.6.7.8"},
-                )
-                assert first.status_code == 200
-                # no proxy https signal -> both map to the same peer IP -> 429
-                assert second.status_code == 429
-        finally:
-            get_settings.cache_clear()
+    def test_forged_xff_ignored_without_proxy_signal(self, fresh_app_client) -> None:
+        app_client = fresh_app_client({"RATE_LIMIT_PER_MINUTE": "1"})
+        first = app_client.post(
+            "/api/v1/check",
+            json={"url": "https://a.com/"},
+            headers={"X-Forwarded-For": "1.2.3.4"},
+        )
+        second = app_client.post(
+            "/api/v1/check",
+            json={"url": "https://b.com/"},
+            headers={"X-Forwarded-For": "5.6.7.8"},
+        )
+        assert first.status_code == 200
+        # no proxy https signal -> both map to the same peer IP -> 429
+        assert second.status_code == 429
 
-    def test_forwarded_ip_used_behind_proxy(self, monkeypatch, public_dns) -> None:
-        monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "1")
-        get_settings.cache_clear()
-        try:
-            with TestClient(create_app()) as app_client:
-                first = app_client.post(
-                    "/api/v1/check",
-                    json={"url": "https://c.com/"},
-                    headers={"X-Forwarded-For": "9.9.9.9", "X-Forwarded-Proto": "https"},
-                )
-                second = app_client.post(
-                    "/api/v1/check",
-                    json={"url": "https://d.com/"},
-                    headers={"X-Forwarded-For": "8.8.8.8", "X-Forwarded-Proto": "https"},
-                )
-                assert first.status_code == 200
-                assert second.status_code == 200  # distinct forwarded IPs, distinct buckets
-        finally:
-            get_settings.cache_clear()
+    def test_forwarded_ip_used_behind_proxy(self, fresh_app_client) -> None:
+        app_client = fresh_app_client({"RATE_LIMIT_PER_MINUTE": "1"})
+        first = app_client.post(
+            "/api/v1/check",
+            json={"url": "https://c.com/"},
+            headers={"X-Forwarded-For": "9.9.9.9", "X-Forwarded-Proto": "https"},
+        )
+        second = app_client.post(
+            "/api/v1/check",
+            json={"url": "https://d.com/"},
+            headers={"X-Forwarded-For": "8.8.8.8", "X-Forwarded-Proto": "https"},
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200  # distinct forwarded IPs, distinct buckets

@@ -10,6 +10,10 @@ resolved, screened, and connected *to the screened address* — no second,
 unchecked resolution can slip past the guard (see app.transport). An
 external client can be injected instead for tests (respx mocks at the
 httpcore layer, which the pinned transport intentionally bypasses).
+
+Protocol-downgrade protection: when ``allow_http_redirect_from_https`` is
+False (default), any redirect from HTTPS to HTTP breaks the chain and adds
+a risk score instead of silently following the link.
 """
 
 import logging
@@ -60,7 +64,9 @@ async def _fetch_once(http: httpx.AsyncClient, url: str) -> httpx.Response:
 
 
 async def check_redirect_chain(
-    url: ValidatedURL, http: httpx.AsyncClient | None = None
+    url: ValidatedURL,
+    http: httpx.AsyncClient | None = None,
+    allow_http_redirect_from_https: bool = False,
 ) -> CheckResult:
     """Walk the redirect chain. ``http`` is injectable for tests; when omitted,
     a client over the IP-pinned transport is created for the walk."""
@@ -73,6 +79,7 @@ async def check_redirect_chain(
         )
 
     current = url.outbound_url
+    original_scheme = url.scheme
     hosts = [url.host]
     redirects = 0
 
@@ -81,8 +88,8 @@ async def check_redirect_chain(
             try:
                 response = await _fetch_once(http, current)
             except URLValidationError as exc:
-                # the pinned transport re-screened the host and caught a
-                # rebinding-style evasion — treat it like a blocked hop
+                # The pinned transport re-screened the host and caught a
+                # rebinding-style evasion — treat it like a blocked hop.
                 return _result(
                     CheckStatus.TRIGGERED,
                     15,
@@ -93,15 +100,39 @@ async def check_redirect_chain(
                 if redirects == 0:
                     logger.warning("Redirect probe for %s failed: %s", url.host, exc)
                     return _result(CheckStatus.UNAVAILABLE, 0, "The URL could not be reached")
-                break  # score what we saw before the chain died
+                break  # Score what we saw before the chain died.
 
             if not response.is_redirect or "location" not in response.headers:
                 break
 
             next_url = urljoin(current, response.headers["location"])
+
+            # Validate syntax first. Invalid targets (private IPs, etc.)
+            # are rejected immediately.
             try:
-                validated = validate_url_syntax(next_url)
-                await ensure_host_resolves_public(validated.host)
+                validated_next = validate_url_syntax(next_url)
+            except URLValidationError:
+                return _result(
+                    CheckStatus.TRIGGERED,
+                    15,
+                    f"Redirect hop {redirects + 1} points to a blocked address "
+                    f"({next_url})",
+                )
+
+            # Block protocol downgrades unless explicitly allowed.
+            # A HTTPS page redirecting to HTTP leaks credentials and enables MITM.
+            if validated_next.scheme == "http" and original_scheme == "https":
+                if not allow_http_redirect_from_https:
+                    return _result(
+                        CheckStatus.TRIGGERED,
+                        10,
+                        f"HTTPS-to-HTTP downgrade detected at hop {redirects + 1} "
+                        f"({next_url}). The final destination cannot be safely "
+                        f"verified.",
+                    )
+
+            try:
+                await ensure_host_resolves_public(validated_next.host)
             except URLValidationError:
                 return _result(
                     CheckStatus.TRIGGERED,
@@ -111,8 +142,8 @@ async def check_redirect_chain(
                 )
 
             redirects += 1
-            hosts.append(validated.host)
-            current = validated.outbound_url
+            hosts.append(validated_next.host)
+            current = validated_next.outbound_url
     finally:
         if owned_client:
             await http.aclose()

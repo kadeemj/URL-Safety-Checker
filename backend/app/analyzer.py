@@ -23,12 +23,17 @@ async def analyze(
     http: httpx.AsyncClient,
     gsb_api_key: str,
     redirect_http: httpx.AsyncClient | None = None,
+    allow_http_redirect_from_https: bool = False,
 ) -> AnalysisResponse:
     """Run the full pipeline. Raises URLValidationError on unacceptable input.
 
     ``redirect_http`` selects the client used to walk redirect chains:
     ``None`` (default) means a dedicated client over the IP-pinned transport;
     a shared/mocked client can be injected when resolvers are stubbed.
+
+    ``allow_http_redirect_from_https`` controls whether redirects from
+    HTTPS to HTTP are permitted during chain walking. Defaults to False
+    to block downgrade attacks.
     """
     started = time.perf_counter()
 
@@ -37,12 +42,12 @@ async def analyze(
 
     checks = [check(validated) for check in LOCAL_CHECKS]
 
-    # network checks run concurrently; each degrades to 'unavailable' on its
-    # own rather than raising. credentials are stripped from outbound_url.
+    # Network checks run concurrently; each degrades to 'unavailable' on its
+    # own rather than raising. Credentials are stripped from outbound_url.
     (safe_browsing, sb_check), age_check, redirect_check = await asyncio.gather(
         lookup_safe_browsing(validated.outbound_url, http, gsb_api_key),
         check_domain_age(validated.host, http),
-        check_redirect_chain(validated, redirect_http),
+        check_redirect_chain(validated, redirect_http, allow_http_redirect_from_https),
     )
     checks.extend([sb_check, age_check, redirect_check])
 

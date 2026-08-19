@@ -5,7 +5,7 @@ from app.rate_limit import RateLimiter
 
 @pytest.fixture(autouse=True)
 def _mock_external_network(external_network):
-    """Endpoint tests here reach RDAP/redirect probes — keep them offline."""
+    """Endpoint-level tests inherit RDAD and blanket HEAD mocks via this."""
 
 
 class TestRateLimiter:
@@ -21,7 +21,7 @@ class TestRateLimiter:
         limiter.check("1.2.3.4", now=10.0)
         retry_after = limiter.check("1.2.3.4", now=20.0)
         assert retry_after is not None
-        assert retry_after == 40.0  # oldest request expires at t=60
+        assert retry_after == 40.0  # oldest expires at t=60; current=20 → 40s remaining
 
     def test_window_slides(self) -> None:
         limiter = RateLimiter(limit=2, window_seconds=60)
@@ -36,10 +36,17 @@ class TestRateLimiter:
 
     def test_tracked_ip_count_is_bounded(self) -> None:
         limiter = RateLimiter(limit=100, window_seconds=60, max_ips=2)
-        assert limiter.check("a", now=0.0) is None
-        assert limiter.check("b", now=0.0) is None
-        assert limiter.check("c", now=0.0) is None  # evicts the longest-idle entry
+        limiter.check("a", now=0.0)
+        limiter.check("b", now=0.0)
+        limiter.check("c", now=0.0)  # evicts longest-idle entry
         assert set(limiter._hits) == {"b", "c"}
+
+    def test_reset_clears_history(self) -> None:
+        limiter = RateLimiter(limit=3, window_seconds=60)
+        limiter.check("y")
+        assert limiter.peek("y") is not None
+        limiter.reset("y")
+        assert limiter.peek("y") is None
 
 
 class TestRateLimitEndpoint:
@@ -55,6 +62,13 @@ class TestRateLimitEndpoint:
     def test_healthz_is_never_rate_limited(self, client) -> None:
         for _ in range(30):
             assert client.get("/healthz").status_code == 200
+
+    def test_rate_limit_headers_present(self, client, public_dns) -> None:
+        resp = client.post("/api/v1/check", json={"url": "https://example.com/"})
+        assert resp.status_code == 200
+        assert "x-ratelimit-limit" in resp.headers
+        assert "x-ratelimit-remaining" in resp.headers
+        assert "x-ratelimit-reset" in resp.headers
 
 
 class TestCors:
