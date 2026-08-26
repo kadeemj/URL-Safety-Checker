@@ -94,6 +94,15 @@ async def check_domain_age(
     age_days = (datetime.now(UTC) - registered).days
     registered_on = registered.date().isoformat()
 
+    # Clock skew or bad registry data can put the registration in the future.
+    # That is not a "brand new" domain; it is data we cannot score.
+    if age_days < 0:
+        return _result(
+            CheckStatus.UNAVAILABLE,
+            0,
+            f"Registry reported a future registration date ({registered_on})",
+        )
+
     if age_days < BRAND_NEW_DAYS:
         return _result(
             CheckStatus.TRIGGERED,

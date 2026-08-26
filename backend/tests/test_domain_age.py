@@ -58,6 +58,15 @@ async def test_subdomain_is_looked_up_by_registrable_domain(http) -> None:
 
 
 @respx.mock
+async def test_future_registration_date_reports_unavailable(http) -> None:
+    # Clock skew or bad registry data; must not score as "brand new".
+    respx.get("https://rdap.org/domain/skewed.com").respond(json=rdap_body(-3))
+    result = await check_domain_age("skewed.com", http)
+    assert result.status == CheckStatus.UNAVAILABLE
+    assert result.points == 0
+
+
+@respx.mock
 async def test_rdap_404_reports_unavailable(http) -> None:
     respx.get("https://rdap.org/domain/unknown.com").respond(status_code=404)
     result = await check_domain_age("unknown.com", http)

@@ -51,6 +51,12 @@ class TestPunycodeHomoglyph:
     def test_plain_ascii_passes(self) -> None:
         assert check_punycode_homoglyph(v("https://example.com/")).status == CheckStatus.PASSED
 
+    def test_cyrillic_brand_in_subdomain_triggers_20(self) -> None:
+        result = check_punycode_homoglyph(v("https://pаypаl.com.evil.tk/"))  # Cyrillic а
+        assert result.status == CheckStatus.TRIGGERED
+        assert result.points == 20
+        assert "paypal" in (result.evidence or "").lower()
+
 
 class TestTyposquatting:
     def test_one_edit_from_brand_triggers_25(self) -> None:
@@ -67,6 +73,12 @@ class TestTyposquatting:
         result = check_typosquatting(v("http://paypal.com.evil.tk/"))
         assert result.status == CheckStatus.TRIGGERED
         assert result.points == 20
+
+    def test_brand_substring_in_subdomain_does_not_trigger(self) -> None:
+        # 'notpaypal.com' contains 'paypal.com' as a substring, but not on a
+        # label boundary; substring matching was a false-positive source.
+        result = check_typosquatting(v("http://notpaypal.com.evil.tk/"))
+        assert result.status == CheckStatus.PASSED
 
     def test_exact_brand_passes(self) -> None:
         result = check_typosquatting(v("https://www.paypal.com/"))

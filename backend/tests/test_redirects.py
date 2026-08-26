@@ -86,6 +86,18 @@ async def test_shortener_hop_adds_5(http, public_dns) -> None:
 
 
 @respx.mock
+async def test_downgrade_after_upgrade_triggers_10(http, public_dns) -> None:
+    # http -> https -> http: the re-downgrade is compared against the previous
+    # hop's scheme, not the original one.
+    respx.head("http://a.com/").respond(301, headers={"location": "https://b.com/"})
+    respx.head("https://b.com/").respond(301, headers={"location": "http://c.com/"})
+    result = await check_redirect_chain(v("http://a.com/"), http)
+    assert result.status == CheckStatus.TRIGGERED
+    assert result.points == 10
+    assert "downgrade" in (result.evidence or "").lower()
+
+
+@respx.mock
 async def test_connection_error_reports_unavailable(http, public_dns) -> None:
     respx.head("https://down.com/").mock(side_effect=httpx.ConnectError("refused"))
     result = await check_redirect_chain(v("https://down.com/"), http)

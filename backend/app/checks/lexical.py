@@ -119,6 +119,29 @@ def check_punycode_homoglyph(url: ValidatedURL) -> CheckResult:
                     f"visually identical to the brand '{brand}'"
                 ),
             )
+    # A look-alike brand hidden in the *subdomain* (pаypаl.com.evil.tk) is the
+    # homoglyph twin of the subdomain typosquat, so it carries the same 20
+    # points. Skipped when the registrable domain is the brand's own.
+    ext = extract(decoded_host)
+    if registrable_domain(decoded_host) not in BRAND_DOMAINS:
+        for sub_label in filter(None, ext.subdomain.split(".")):
+            label_skeleton = skeleton(sub_label)
+            for brand in sorted(BRAND_LABELS):
+                if label_skeleton == brand:
+                    return _result(
+                        "punycode_homoglyph",
+                        "Look-alike characters",
+                        25,
+                        explanation,
+                        triggered=True,
+                        points=20,
+                        evidence=(
+                            f"Subdomain label '{sub_label}' looks identical to the "
+                            f"brand '{brand}', but the real destination is "
+                            f"'{registrable_domain(decoded_host) or decoded_host}'"
+                        ),
+                    )
+
     # International characters alone are not a risk signal. Punishing every
     # non-Latin domain would flag legitimate regional sites (übung.de,
     # bücher.de, etc.). Only a skeleton that matches a known brand is an
@@ -168,7 +191,9 @@ def check_typosquatting(url: ValidatedURL) -> CheckResult:
         sub_labels = set(subdomain.split("."))
         for brand_domain in sorted(BRAND_DOMAINS):
             brand = brand_domain.split(".")[0]
-            if brand_domain in subdomain or brand in sub_labels:
+            # Label-boundary match, not substring: 'paypal.com.evil.tk' should
+            # trigger, 'notpaypal.com.evil.tk' should not.
+            if f".{brand_domain}." in f".{subdomain}." or brand in sub_labels:
                 best_points = 20
                 evidence = (
                     f"The trusted name '{brand}' appears in the subdomain, but "

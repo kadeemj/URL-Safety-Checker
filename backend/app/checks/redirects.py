@@ -79,7 +79,7 @@ async def check_redirect_chain(
         )
 
     current = url.outbound_url
-    original_scheme = url.scheme
+    current_scheme = url.scheme
     hosts = [url.host]
     redirects = 0
 
@@ -121,7 +121,9 @@ async def check_redirect_chain(
 
             # Block protocol downgrades unless explicitly allowed.
             # A HTTPS page redirecting to HTTP leaks credentials and enables MITM.
-            if validated_next.scheme == "http" and original_scheme == "https":
+            # Compared against the previous hop's scheme, not the original: an
+            # http -> https -> http chain re-downgrades and must be flagged too.
+            if validated_next.scheme == "http" and current_scheme == "https":
                 if not allow_http_redirect_from_https:
                     return _result(
                         CheckStatus.TRIGGERED,
@@ -144,6 +146,7 @@ async def check_redirect_chain(
             redirects += 1
             hosts.append(validated_next.host)
             current = validated_next.outbound_url
+            current_scheme = validated_next.scheme
     finally:
         if owned_client:
             await http.aclose()
