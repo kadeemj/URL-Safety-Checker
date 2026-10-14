@@ -50,21 +50,21 @@ class TestRateLimiter:
 
 
 class TestRateLimitEndpoint:
-    def test_429_after_burst(self, client, public_dns) -> None:
+    async def test_429_after_burst(self, client, public_dns) -> None:
         responses = [
-            client.post("/api/v1/check", json={"url": "https://example.com/"})
+            await client.post("/api/v1/check", json={"url": "https://example.com/"})
             for _ in range(11)
         ]
         assert all(r.status_code == 200 for r in responses[:10])
         assert responses[10].status_code == 429
         assert "retry-after" in responses[10].headers
 
-    def test_healthz_is_never_rate_limited(self, client) -> None:
+    async def test_healthz_is_never_rate_limited(self, client) -> None:
         for _ in range(30):
-            assert client.get("/healthz").status_code == 200
+            assert (await client.get("/healthz")).status_code == 200
 
-    def test_rate_limit_headers_present(self, client, public_dns) -> None:
-        resp = client.post("/api/v1/check", json={"url": "https://example.com/"})
+    async def test_rate_limit_headers_present(self, client, public_dns) -> None:
+        resp = await client.post("/api/v1/check", json={"url": "https://example.com/"})
         assert resp.status_code == 200
         assert "x-ratelimit-limit" in resp.headers
         assert "x-ratelimit-remaining" in resp.headers
@@ -72,16 +72,16 @@ class TestRateLimitEndpoint:
 
 
 class TestCors:
-    def test_allowed_origin_gets_cors_headers(self, client, public_dns) -> None:
-        response = client.post(
+    async def test_allowed_origin_gets_cors_headers(self, client, public_dns) -> None:
+        response = await client.post(
             "/api/v1/check",
             json={"url": "https://example.com/"},
             headers={"Origin": "http://localhost:8000"},
         )
         assert response.headers.get("access-control-allow-origin") == "http://localhost:8000"
 
-    def test_unknown_origin_gets_no_cors_headers(self, client, public_dns) -> None:
-        response = client.post(
+    async def test_unknown_origin_gets_no_cors_headers(self, client, public_dns) -> None:
+        response = await client.post(
             "/api/v1/check",
             json={"url": "https://example.com/"},
             headers={"Origin": "https://attacker.example"},

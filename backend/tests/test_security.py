@@ -65,9 +65,9 @@ async def test_https_to_https_redirect_allowed():
 
 
 class TestErrorSanitization:
-    def test_400_does_not_leak_traceback(self, strict_client):
+    async def test_400_does_not_leak_traceback(self, strict_client):
         """Validation errors must not include stack traces or file paths."""
-        resp = strict_client.post(
+        resp = await strict_client.post(
             "/api/v1/check", json={"url": "ftp:///etc/passwd"}
         )
         body = resp.json()
@@ -77,13 +77,13 @@ class TestErrorSanitization:
         assert "File " not in detail
         assert resp.status_code == 400
 
-    def test_500_message_is_sanitized(self, strict_client, monkeypatch):
+    async def test_500_message_is_sanitized(self, strict_client, monkeypatch):
         """Unexpected errors must hide internal details."""
         def always_nxdomain(*args, **kwargs):
             raise _socket_mod.gaierror("BOOM")
 
         monkeypatch.setattr("app.validation.socket.getaddrinfo", always_nxdomain)
-        resp = strict_client.post(
+        resp = await strict_client.post(
             "/api/v1/check", json={"url": "https://will-crash.example/"}
         )
         body = resp.json()
