@@ -1,8 +1,9 @@
 import socket
+from contextlib import AsyncExitStack, asynccontextmanager
 
+import httpx
 import pytest
 import respx
-from fastapi.testclient import TestClient
 
 from app.main import create_app
 
@@ -45,44 +46,52 @@ def _default_test_env(monkeypatch):
 
 # -- App clients -----------------------------------------------------------
 
+@asynccontextmanager
+async def app_client(app):
+    """Drive the app in-process over httpx, running its lifespan like a server would."""
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            yield ac
+
+
 @pytest.fixture()
-def client():
+async def client():
     """Standard test client with CORS enabled for localhost."""
     from app.config import get_settings
     get_settings.cache_clear()
-    with TestClient(create_app()) as tc:
-        yield tc
+    async with app_client(create_app()) as ac:
+        yield ac
 
 
 @pytest.fixture()
-def strict_client(monkeypatch):
+async def strict_client(monkeypatch):
     """Test client with CORS blocked and docs hidden."""
     monkeypatch.setenv("ALLOWED_ORIGINS", "")
     monkeypatch.setenv("EXPOSE_API_DOCS", "false")
     from app.config import get_settings
     get_settings.cache_clear()
-    with TestClient(create_app()) as tc:
-        yield tc
+    async with app_client(create_app()) as ac:
+        yield ac
 
 
 @pytest.fixture()
-def fresh_app_client(monkeypatch, public_dns):
-    """Create a fresh TestClient with isolated environment.
+async def fresh_app_client(monkeypatch, public_dns):
+    """Create a fresh client with isolated environment.
 
     For tests that need custom env vars beyond what autouse provides.
     """
-    def _make(extra_env=None):
-        env = dict(DEFAULT_ENV)
-        if extra_env:
-            env.update(extra_env)
-        for k, v in env.items():
-            monkeypatch.setenv(k, v)
-        from app.config import get_settings
-        get_settings.cache_clear()
-        tc = TestClient(create_app())
-        tc.__enter__()
-        return tc
-    yield _make
+    async with AsyncExitStack() as stack:
+        async def _make(extra_env=None):
+            env = dict(DEFAULT_ENV)
+            if extra_env:
+                env.update(extra_env)
+            for k, v in env.items():
+                monkeypatch.setenv(k, v)
+            from app.config import get_settings
+            get_settings.cache_clear()
+            return await stack.enter_async_context(app_client(create_app()))
+        yield _make
 
 
 PUBLIC_ADDRINFO = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 80))]
