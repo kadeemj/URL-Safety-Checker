@@ -25,6 +25,7 @@ import socket
 import ssl
 import time
 
+import certifi
 import httpx
 
 from app.validation import resolve_public_addresses
@@ -149,7 +150,11 @@ class PinnedTransport(httpx.AsyncBaseTransport):
         scheme = request.url.scheme
         port = request.url.port or (443 if scheme == "https" else 80)
         ip = await self._pinned_ip(host)
-        ssl_context = ssl.create_default_context() if scheme == "https" else None
+        # Trust the pinned certifi bundle, not the image's system store, which can lag
+        # behind on CA removals; this matches httpx's own default for the shared client.
+        ssl_context = (
+            ssl.create_default_context(cafile=certifi.where()) if scheme == "https" else None
+        )
         return await _exchange(request, ip, host, port, ssl_context, self.timeout)
 
     async def _pinned_ip(self, host: str) -> str:

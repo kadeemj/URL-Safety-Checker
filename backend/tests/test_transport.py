@@ -97,6 +97,24 @@ async def test_https_connects_to_pinned_ip_with_server_hostname(public_dns, monk
     assert response.headers["location"] == "https://elsewhere.example/"
 
 
+async def test_https_trusts_certifi_bundle_not_system_store(public_dns, monkeypatch) -> None:
+    # The system CA store in the image can lag behind certifi (GHSA-6q48-6c7w-9gw2),
+    # so pinned TLS must verify against the pinned certifi bundle.
+    import certifi
+
+    cafiles: list[str | None] = []
+    real = transport.ssl.create_default_context
+
+    def spy(*args, **kwargs):
+        cafiles.append(kwargs.get("cafile"))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(transport.ssl, "create_default_context", spy)
+    monkeypatch.setattr(transport, "_connect_tcp", lambda *a, **kw: FakeSocket(TLS))
+    await PinnedTransport().handle_async_request(request("HEAD", "https://example.com/"))
+    assert cafiles == [certifi.where()]
+
+
 async def test_http_connects_plaintext(public_dns, monkeypatch) -> None:
     seen: list[tuple] = []
 
