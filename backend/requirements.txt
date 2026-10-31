@@ -1,7 +1,7 @@
 fastapi==0.145.0
 uvicorn==0.54.0
 httpx==0.28.1
-pydantic-settings==2.16.0
+pydantic-settings==2.16.1
 tldextract==5.4.0
 # transitive (fastapi/starlette, httpx); pinned for GHSA-82r6-8w77-94w6 / CVE-2026-63374
 anyio==4.15.1
