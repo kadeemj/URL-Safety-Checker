@@ -1,0 +1,3 @@
+# Default owner for everything in this repository.
+# GitHub requests a review from code owners on every new PR, including Dependabot's.
+* @kadeemj
