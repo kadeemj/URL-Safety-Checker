@@ -2,6 +2,7 @@
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     "error",
     # upstream libs still call asyncio.iscoroutinefunction on Python 3.14
